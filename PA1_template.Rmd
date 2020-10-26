@@ -1,25 +1,184 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template"
+author: "Susana"
+date: "25 de octubre de 2020"
+output: html_document
 ---
 
 
-## Loading and preprocessing the data
+
+```{r setup, include=FALSE}
+  library("dplyr")
+  library("tidyr")
+  library("xtable")
+  library("ggplot2")
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Loading and preprocessing the data
+# What is mean total number of steps taken per day?
+
+```{r }
+
+  act <- read.csv("activity.csv")
+  d1 <-act %>%
+    select(date, steps) %>%
+    filter(!is.na(steps))  %>%
+    group_by(date) %>%
+    summarize(
+      sum_steps = sum(steps),
+      mean_steps = mean(steps)
+      ) %>%
+    arrange(date)
+
+
+with(d1, hist(sum_steps, main="Total steps per day", xlab="Total steps per day"))
+
+dev.copy(png, file="p1_hist.png", width =480 , height = 480)
+dev.off()
+
+```
+
+## Calculate and report the mean and median of the total number of steps taken per day
 
 
 
-## What is mean total number of steps taken per day?
+```{r showtable, results="asis", echo=TRUE}
 
+dt <- d1 %>%
+    select(sum_steps) %>%
+    summarize(
+      mean_steps = mean(sum_steps),
+      median_steps = median(sum_steps)
+      ) 
 
-
+ xt <- xtable(dt)
+ print(xt, type="html")
+ 
+```
+ 
 ## What is the average daily activity pattern?
+```{r echo=TRUE}
+  
+  d2 <-act %>%
+    select(interval, steps) %>%
+    filter(!is.na(steps))  %>%
+    group_by(interval) %>%
+    summarize(
+      mean_steps = mean(steps)
+      ) %>%
+    arrange(interval)
+
+#head(d2)
+with(d2, plot(interval, mean_steps, type="l",  main="Average number of steps taken", ylab = "Average steps", col="blue"))
+
+  dmax <-d2 %>%
+    select(mean_steps, interval) %>%
+    filter(mean_steps == max(mean_steps))
+max_i <- with(dmax,interval)
+with(d2, abline(h=max(mean_steps), v=max_i,  col= "gray", lty = "dotted"))
+with(dmax, points( interval,  mean_steps , col = "red", pch = 8))
+
+legend("topright", col="red",legend=paste("Interval with maximun number of steps?", max_i), pch = 8, cex=0.8)
+
+dev.copy(png, file="p2_lines.png", width =480 , height = 480)
+dev.off() 
+
+```
+ 
+## Imputing missing values 
+
+```{r echo=TRUE}
+
+#Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+sum(is.na(act$steps))
+
+#Strategy for filling data
+davg <- merge(act, d2 , by = "interval", all=TRUE)
+# head(davg)
+# names(davg)
+
+  dfill <-davg %>%
+      select(date, steps, interval, mean_steps) %>%
+      mutate(step_filled = case_when(steps>=0 ~ steps,
+                                     is.na(steps) == TRUE ~ as.integer(mean_steps)))
+
+
+# Make a histogram of the total number of steps taken each day
+  
+    dfill2 <-dfill %>%
+    select(date, step_filled) %>%
+    group_by(date) %>%
+    summarize(
+      sum_steps = sum(step_filled)
+      ) %>%
+    arrange(date)
+    
+   with(dfill2, hist(sum_steps, main="Total steps per day", xlab="Total steps per day"))
+   
+ dev.copy(png, file="p3_hist.png", width =480 , height = 480)
+ dev.off() 
+ 
+```
+ 
+## Calculate and report the mean and median total number of steps taken per day. 
+
+
+```{r results="asis", echo=TRUE}
+
+dt2 <- dfill2 %>%
+    select(sum_steps) %>%
+    summarize(
+      mean_steps = mean(sum_steps),
+      median_steps = mean(sum_steps)
+      ) 
+
+ xt2 <- xtable(dt2)
+ print(xt2, type="html")
+
+```
+## Do these values differ from the estimates from the first part of the assignment? 
+ YES 
+ 
+## What is the impact of imputing missing data on the estimates of the total daily number of steps? 
+The results changes, the values are lower 
+
+```{r echo=TRUE}
+ 
+
+
+  weekday <- subset( dfill, as.POSIXlt(date)$wday == 1 | as.POSIXlt(date)$wday == 2 | 
+                       as.POSIXlt(date)$wday == 3 | as.POSIXlt(date)$wday == 4 |
+                       as.POSIXlt(date)$wday == 5 ) 
+  weekday$wd <- "weekday"
+  weekend <- subset( dfill, as.POSIXlt(date)$wday ==6 | as.POSIXlt(date)$wday == 0)
+  weekend$wd <- "weekend"
+  
+  week2  <- rbind(weekday, weekend)
+  
+  
+    dfw <-week2 %>%
+    select(interval, step_filled, wd) %>%
+    group_by(interval,wd) %>%
+    summarize(
+      mean_steps = mean(step_filled)
+      ) %>%
+    arrange(interval)
+
+
+    g <- ggplot( dfw, aes(interval, mean_steps))
+g2 <- g+geom_line(aes(color=wd), size = 4, alpha =1/2)+
+  facet_grid( wd ~ .)+
+  labs(x="Interval", y="Average number of steps taken") +
+  ggtitle("Weekday vs weekend ")
+
+print(g2)
+dev.copy(png, file="p4_lines.png", width =480 , height = 480)
+dev.off() 
+
+```
 
 
 
-## Imputing missing values
 
 
-
-## Are there differences in activity patterns between weekdays and weekends?
